@@ -1,242 +1,372 @@
 //BT20CSE100 Priyatham Rathod - SL Assignment 4.
 
 #include<stdio.h>
-#include<string.h>
-#include<unistd.h>
+#include<stdbool.h>
 #include<stdlib.h>
-typedef enum{FALSE,TRUE} boolean;
 
-/* for storing metadata of block*/
-typedef struct blockMetaData Header;
-
-struct blockMetaData{
-    size_t size;
-    boolean isFree;
-    Header *next;
-};
-
-#define META_SIZE sizeof(Header)
-#define SBRK_FAILURE (void*)-1
-
-void *header = NULL;
-
-void outOfMemory()
+typedef struct node
 {
-    printf("\t[+] Sorry could not allocate requested memory\n");
+    int data;
+    bool mark;
+    int refCount;
+    struct node *next1;
+    struct node *next2;
+    struct node *next3;    
+}Node;
+
+ Node *ptrArr[8];
+
+void displayNode(int i)
+{
+	printf("value=%d\t reference_count=%d freed_size=%d\n",ptrArr[i]->data,ptrArr[i]->refCount,sizeof(Node));
 }
 
-Header *requestSpaceFromOS(Header *lptr,size_t size)
+void setEdge(int so,int destination1,int destination2,int destination3)
 {
-
-    printf("\t[+] Intialising sbrk()....\n");         //sbrk() stands for Space increments after program break address.
-    Header *block = sbrk(0);
-    printf("\t[+] Creating space of size %ld bytes using the input given by you...\n",size);
-
-    void *request = sbrk(size+META_SIZE);
-    if(request==SBRK_FAILURE)
-    {
-        outOfMemory();
-        return NULL;
-    }
-    printf("\t[+] Done.\n");
-
-    if(lptr!=NULL)
-    {
-        lptr->next=block;
-    }
-
-    block->size = size;
-    block->next = NULL;
-    block->isFree = FALSE;
-
-    return block;
+	if(destination1!=-1)
+	{
+		ptrArr[so]->next1=ptrArr[destination1];
+		ptrArr[destination1]->refCount+=1;
+	}
+	if(destination2!=-1)
+	{
+		ptrArr[so]->next2=ptrArr[destination2];
+		ptrArr[destination2]->refCount+=1;
+	}
+	if(destination3!=-1)
+	{
+		ptrArr[so]->next3=ptrArr[destination3];
+		ptrArr[destination3]->refCount+=1;
+	}
+	
 }
 
-boolean canSplit(Header* block,size_t size)
+void displayAllNodes(Node* root)
 {
-    boolean retVal = FALSE;
-    if((block->size) - size > 0) retVal = TRUE;
-
-    return retVal;
+	if(root!=NULL)
+	{
+		printf("value=%d:refCount=%d\n",root->data,root->refCount);
+	}
+	if(root==NULL)
+	{
+		return;
+	}
+	displayAllNodes(root->next1);
+	displayAllNodes(root->next2);
+	displayAllNodes(root->next3);
 }
 
-void* split(Header** block, size_t size)
+void adjacencyList()
 {
-    Header* freePart = (Header*)((*block)+size);
-    printf("\t[+] Splitting function has been initialised...\n");
-    freePart->size = ( (*block)->size )-size;
-    freePart->isFree = TRUE;
-    freePart->next=(*block)->next;
-
-    (*block)->size = size;
-    (*block)->isFree = FALSE;
-    (*block)->next=freePart;
-    printf("\t[+] Size of new blocks are freeblock-->%ld bytes and allocated block-->%ld bytes\n",freePart->size,(*block)->size);
+	int i=0;
+	for(i=0;i<8;i++)
+	{
+		if(ptrArr[i]!=NULL)
+		{
+			printf("Value=%d: ",ptrArr[i]->data);
+			if(ptrArr[i]->next1!=NULL)
+			{
+				printf("%d ->",ptrArr[i]->next1->data);
+			}
+			if(ptrArr[i]->next2!=NULL)
+			{
+				printf("%d ->",ptrArr[i]->next2->data);
+			}
+			if(ptrArr[i]->next3!=NULL)
+			{
+				printf("%d ->",ptrArr[i]->next3->data);
+			}
+			printf("NULL\n");
+		}
+	}
 }
 
-Header*  getFreeBlock(Header** end,size_t size)
+int rootIsPresent(Node* root1,Node* temp)
 {
-    printf("\t[+] Search function has been initialised..\n");
-    printf("\t[+] Please wait, finding the free block of size %ld bytes...\n",size);
-    Header* current = header;
-    while (current!=NULL)
-    {
-        *end=current;
-        if(current->isFree==TRUE&&current->size>=size) return current;
-        current=current->next;
-    }
-
-    return NULL;
+	if(root1==NULL)
+	{
+		return 0;
+	}
+	if(root1->data==temp->data)
+	{
+		return 1;
+	}
+	
+	if(rootIsPresent(root1->next1,temp))
+	{
+		return 1;
+	}
+	
+	if(rootIsPresent(root1->next2,temp))
+	{
+		return 1;
+	}
+	if(rootIsPresent(root1->next3,temp))
+	{
+		return 1;
+	}
+ return 0;
 }
 
-void  *MemAlloc(size_t size)
+
+void garbageCollectionrefCounting(Node* root)
 {
+	int i=0;
+	while(i<8)
+	{
+		if(rootIsPresent(root,ptrArr[i])==0 )
+		{		
+			if(ptrArr[i]->next1!=NULL)
+			{
+				ptrArr[i]->next1->refCount-=1;
+			}
+			if(ptrArr[i]->next2!=NULL)
+			{
+				ptrArr[i]->next2->refCount-=1;
+			}
+			if(ptrArr[i]->next3!=NULL)
+			{
+				ptrArr[i]->next3->refCount-=1;
+			}
+			printf("Garbage:");
+			displayNode(i);
+			free(ptrArr[i]);
+			ptrArr[i]=NULL;
+		}
+		i++;		
+	}
+	 
+}
 
-    printf("\t[+] Malloc function initialising....\n");
-    printf("\t[+] Allocating a memory of size %ld bytes as requested by you.....\n",size );
-    if(size<=0)
-    {
-        printf("\t[+] Done\n");
-        return NULL;
-    }
+void adjacencyMatrix()
+{
+	int adm[8][8];
+	int i,j,k;
+	
+	for(i=0;i<8;i++)		
+	{
+		for(j=0;j<8;j++)
+		{
+			adm[i][j]=0;
+		}	
+	}
+	
+	for(i=0;i<8;i++)
+	{
+		for(j=0;j<8;j++)
+		{
+			
+		if(ptrArr[j]!=NULL&&ptrArr[i]!=NULL)
+		{
+			
+			if(ptrArr[i]->next1!=NULL)
+			{
+				if(ptrArr[i]->next1->data==ptrArr[j]->data&&i!=j)
+				{
+					adm[i][j]=1;
+				}
+			}
+			if(ptrArr[i]->next2!=NULL)
+			{
+				if(ptrArr[i]->next2->data==ptrArr[j]->data&&i!=j)
+				{
+					adm[i][j]=1;
+				}
+			}
+			if(ptrArr[i]->next3!=NULL)
+			{
+				if(ptrArr[i]->next3->data==ptrArr[j]->data&&i!=j)
+				{
+					adm[i][j]=1;
+				}
+			}
+		}
+		
+		}
+	}
+	
+	for(i=0;i<8;i++)
+	{
+		for(j=0;j<8;j++)
+		{
+			printf("%d ",adm[i][j]);		
+		}
+		printf("\n");
+	}
+}
 
-    Header *block;
-    if(header==NULL)
+void markTheNodes(Node*root,int i,int j)
+{
+    Node *current, *previous;
+
+    current = root;
+        
+    while (current != NULL) 
     {
-        printf("\t[+] This is your first allocation, hence we are requesting space from operating system please wait..\n");
-        block = requestSpaceFromOS(NULL,size);
-        if(block == NULL)
+  
+        if (current->next1== NULL) 
         {
-            outOfMemory();
-            return NULL;
-        }
-
-        header = block;
-        printf("\t[+] Done.\n");
-    }
-    else
-    {
-        Header *end = header;
-        block = getFreeBlock(&end,size);
-        if(block == NULL)
+            current->mark=true;
+            current = current->next2;
+        }   
+        else 
         {
-            printf("\t[+] Free block is not found in the memory. So we are requesting space from operating system please wait..\n");
-            block = requestSpaceFromOS(end,size);
-
-            if(block == NULL)
+            previous = current->next1;
+            while ((previous->next2 != NULL) && (previous->next2 != current))
             {
-                outOfMemory();
-                return NULL;
-            }
-
-            printf("\t[+] Done.\n");
-        }
-        else
-        {
-            printf("\t[+] We have found a Free block at %p\n",block);
-
-            if(canSplit(block, size))
+            	previous = previous->next2;
+			}
+                
+            if (previous->next2 == NULL) 
             {
-                printf("\t[+] But the size is bigger than you requested..\n");
-                printf("\t[+] So the splitting is being done(Calling Split function)..\n");
-                split(&block,size);
-                printf("\t[+] Splitting is done.\n");
+                previous->next2 = current;
+                current = current->next1;
             }
-            block -> isFree = FALSE;
+            else 
+            {
+                previous->next2 = NULL;
+                current->mark=true;
+                current = current->next2;
+            } 
         }
-    }
-
-    return (block+1);
-}
-
-boolean canMerge(Header* block)
-{
-    boolean retVal = FALSE;
-    if(block->next!=NULL&&(block->next)->isFree==TRUE)
+    }   
+    
+    current = root;
+        
+    while (current != NULL) 
     {
-        retVal=TRUE;
-    }
-
-    return retVal;
+  
+        if (current->next1== NULL) 
+        {
+            current->mark=true;
+            current = current->next3;
+        }   
+        else 
+        {
+            previous = current->next1;
+            while ((previous->next3 != NULL) && (previous->next3 != current))
+            {
+            	previous = previous->next3;
+			}
+                
+            if (previous->next3 == NULL) 
+            {
+                previous->next3 = current;
+                current = current->next1;
+            }
+            else 
+            {
+                previous->next3 = NULL;
+                current->mark=true;
+                current = current->next3;
+            } 
+        }
+    }  
+    
 }
 
-void* mergeBlocks(Header** block)
+void markMethod(Node* root)
 {
-    printf("\t[+] Merge function is initialised. Please wait till the process is completed...\n");
-    (*block)->size+=( (*block)->next )->size;
-    (*block)->next = ( (*block)->next )->next;
+	
+	if(root!=NULL)
+	{
+		root->mark=true;
+	}
+	if(root==NULL)
+	{
+		return;
+	}
+	markMethod(root->next1);
+	markMethod(root->next2);
+	markMethod(root->next3);
 }
 
-void free(void* ptr)
+void sweepMethod()
 {
-    printf("\t[+] Now the free operation will be initialised..\n");
-    printf("\t[+] freeing memory located at %p \n",ptr);
-
-    if(ptr==NULL)
-    {
-        return;
-    }
-    Header* block = (Header*)ptr - 1;
-    printf("\t[+] Freed memory of size %ld bytes located at %p\n",block->size,ptr);
-
-    if(canMerge(block))
-    {
-        printf("\t[+] We have free block adjacent to it\n");
-        printf("\t[+] So now Merge will take place. Please wait till the operationis complete...\n");
-        mergeBlocks(&block);
-        printf("\t[+] Merging is done.\n");
-        printf("\t[+] Size of block which is final is %ld bytes\n",block->size);
-    }
-
-    block->isFree = TRUE;
-    printf("\t[+] Done.\n");
-}
-
-void allocate(size_t size)
-{
-    void* ptr = MemAlloc(size);
-    printf("\t[+] Allocation of memory of size %ld bytes at the address %p on heap is done.\n",size,ptr);
+	int i;
+	for(i=0;i<8;i++)
+	{
+		if(ptrArr[i]->mark==false)
+		{
+			if(ptrArr[i]->next1!=NULL)
+			{
+				ptrArr[i]->next1->refCount-=1;
+			}
+			if(ptrArr[i]->next2!=NULL)
+			{
+				ptrArr[i]->next2->refCount-=1;
+			}
+			if(ptrArr[i]->next3!=NULL)
+			{
+				ptrArr[i]->next3->refCount-=1;
+			}
+			printf("Garbage :");
+			displayNode(i);
+			free(ptrArr[i]);
+			ptrArr[i]=NULL;
+		}
+	}
 }
 
 int main()
-{
-    int option;
-    size_t size;
-    int* ptr;
-    printf("Hi there!\nThis program will implement Heap and allocate memomy and also frees them!\n");
-    printf("Now input the option according to thier number.\n");
-    printf("1.Allocate memory\n2.Free the allocated memory\n3.To exit");
-    while(TRUE)
-    {
-        printf("\nEnter your option:");
-        scanf("%d",&option);
+{		
+	int val[]={1,2,3,4,5,7,8};
+	
+	
+	int i;
+	
+	for( i=0;i<8;i++)
+	{
+		Node* newNode =(Node*)malloc(sizeof(Node));
+		newNode->data=val[i];
+		newNode->next1=NULL;
+		newNode->next2=NULL;
+		newNode->next3=NULL;
+		newNode->refCount=0;
+		newNode->mark=false;		
+		ptrArr[i]=newNode;
+	}
+	
+	Node*root1=ptrArr[3];
+	ptrArr[3]->refCount+=1;
+	Node*root2=ptrArr[0];
+	ptrArr[0]->refCount+=1;
+	
+	setEdge(0,1,6,7);
+	setEdge(2,5,7,-1);
+	setEdge(3,0,-1,-1);
+	setEdge(4,0,5,-1);
+	setEdge(5,6,-1,-1);
+	
+	printf("Root of value 3:");
+	displayNode(2);
+	
+	printf("\nAll the nodes through Root-1:\n");
+	displayAllNodes(root1);
+	
+		
+	printf("\nAll the nodes through Root-2:\n");
+	displayAllNodes(root2);
+	
+	printf("\n\nDisplaying Adjacency list of noeds with their values and vertex:\n");
+	adjacencyList();
+	
+	printf("\n\nDisplaying Adjacency matrix of the nodes:\n");
+	adjacencyMatrix();
+	
 
-        switch (option)
-        {
+	
+	printf("\nCalling mark sweep garbage collector!\n");
+	                                                                //markTheNodes(root1,0,1);
+	markMethod(root1);
+	sweepMethod();
 
-            case 1:
-            {
-                printf("\nOption 1 selected, Enter the size in bytes:");
-                scanf("%ld",&size);
-                allocate(size);
-                break;
-            }
+	
+	printf("\n\nAdjacency list after removal of garbage:\n");
+	adjacencyList();
+	
+	printf("\n\nAdjacency matrix after removal of garbage:\n");
+	adjacencyMatrix();
 
-            case 2:
-            {
-                printf("\nOption 2 selected, Enter the address you wish to free:");
-                scanf("%p",&ptr);
-                free(ptr);
-                break;
-            }
-
-            case 3:
-            {
-                printf("Option 3 selected. Program is terminated!\n");
-                exit(0);
-            }
-        } 
-    }
-
-    return 0;
+	return 0;	
 }
